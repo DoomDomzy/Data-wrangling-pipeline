@@ -23,8 +23,8 @@ Este documento explica el diagnóstico inicial, las decisiones de transformació
 * **Qué decisión se tomó:**
   1. Se eliminaron espacios extras y se aplicó formato tipo título con `.str.strip().str.title()`.
   2. Se aplicó un **mapeo manual explícito** mediante `.replace()` para los casos que `.title()` no resuelve adecuadamente:
-     * `'Bogota'`, `'Ciudad De México'`, `'Cdmx'` $\rightarrow$ `'CDMX'` / `'Bogotá'`
-     * `'Electronica'` $\rightarrow$ `'Electrónica'`
+     * `'Bogota'`, `'Ciudad De México'`, `'Cdmx'` → `'CDMX'` / `'Bogotá'`
+     * `'Electronica'` → `'Electrónica'`
 * **Por qué:** La función `.title()` convierte siglas como `CDMX` en `Cdmx` y no restituye tildes omitidas. Sin esta estandarización, consultas analíticas o agrupaciones (`GROUP BY`) tratarían a `"CDMX"` y `"Cdmx"` como entidades distintas.
 
 ---
@@ -35,7 +35,7 @@ Este documento explica el diagnóstico inicial, las decisiones de transformació
   1. Se utilizó `pd.to_datetime(df['fecha_registro'], format='mixed', dayfirst=True, errors='coerce')`.
   2. Se implementó un **assert de conservación** comparando el conteo de registros no nulos antes vs. después de la transformación:
 
-$$\text{fechas\_después} \ge \text{fechas\_antes} \times 0.95$$
+> **Criterio de Aserción:** `fechas_después >= fechas_antes * 0.95`
 
 * **Por qué:**
   * Sin `format='mixed'`, Pandas fuerza un único formato global para toda la columna; las filas con una sintaxis distinta fallan de forma silenciosa y se convierten en `NaT` al usar `errors='coerce'`.
@@ -65,11 +65,11 @@ $$\text{fechas\_después} \ge \text{fechas\_antes} \times 0.95$$
   * Valores nulos (`NaN`) o textos no numéricos.
 * **Qué decisión se tomó:**
   1. Se realizó la conversión limpia a numérico mediante `pd.to_numeric(..., errors='coerce')`.
-  2. Se estableció como rango de transacción válida: $\$0 < \text{monto\_compra} \le \$5,000$.
+  2. Se estableció como rango de transacción válida: **$0 < monto_compra <= $5,000**.
   3. Los valores fuera del rango, nulos e inviables fueron sustituidos por la **mediana** de las ventas válidas.
 * **Por qué:** 
-  * Transacciones con monto $\le 0$ no corresponden a ventas válidas.
-  * Montos de $\$99,999.00$ corresponden a valores "centinela" o errores de captura que distorsionan gravemente el ticket promedio del negocio. La imputación por mediana protege la integridad estadística de los indicadores financieros.
+  * Transacciones con monto <= 0 no corresponden a ventas válidas.
+  * Montos de $99,999.00 corresponden a valores "centinela" o errores de captura que distorsionan gravemente el ticket promedio del negocio. La imputación por mediana protege la integridad estadística de los indicadores financieros.
 
 ---
 
@@ -80,8 +80,8 @@ $$\text{fechas\_después} \ge \text{fechas\_antes} \times 0.95$$
 | **Duplicados** | Filas 100% idénticas | 1 registro por evento | `drop_duplicates()` | Garantizar unicidad y no inflar métricas. |
 | **Texto** | Espacios, minúsculas, falta de tildes | Formato unificado | `strip()` + `title()` + `replace()` manual | Permitir agrupaciones (`GROUP BY`) consistentes. |
 | **Fechas** | Mezcla de formatos y texto libre | Tipo `datetime64` | `pd.to_datetime(..., errors='coerce')` | Habilitar análisis temporal y convertir errores a `NaT`. |
-| **Edad** | Negativos, $>100$ años y `NaN` | $18 \le \text{edad} \le 100$ | Imputación por mediana válida | Corregir errores sin sesgar la tendencia central. |
-| **Monto Compra** | Montos $\le 0$, $\$99,999$ y `NaN` | $0 < \text{monto} \le 5000$ | Imputación por mediana válida | Proteger el cálculo del ticket promedio. |
+| **Edad** | Negativos, > 100 años y `NaN` | `18 <= edad <= 100` | Imputación por mediana válida | Corregir errores sin sesgar la tendencia central. |
+| **Monto Compra** | Montos <= 0, $99,999 y `NaN` | `$0 < monto <= $5,000` | Imputación por mediana válida | Proteger el cálculo del ticket promedio. |
 
 ---
 
