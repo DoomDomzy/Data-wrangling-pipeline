@@ -1,7 +1,8 @@
 # Documentación del Pipeline de Limpieza de Datos
 
 ## 📌 Resumen General
-Este documento explica el diagnóstico inicial, las decisiones de transformación y la justificación técnica empleada en el script de data wrangling sobre `ventas_sucio.csv` para generar la versión limpia de producción: `ventas_limpio.csv`.
+
+Este documento explica el diagnóstico inicial, las decisiones de transformación y la justificación técnica empleada en el script de *data wrangling* sobre `ventas_sucio.csv` para generar la versión limpia de producción: `ventas_limpio.csv`.
 
 ---
 
@@ -9,7 +10,7 @@ Este documento explica el diagnóstico inicial, las decisiones de transformació
 
 ### 1. Registros Duplicados Exactos
 * **Qué se encontró:** Se identificaron filas 100% idénticas (mismo `id_cliente`, nombre, ciudad, fecha, monto, etc.) producto de reintentos en el sistema de captura o duplicación en la ingesta.
-* **Qué decisión se tomó:** Se eliminaron las filas duplicadas mediante `df.drop_duplicates()` al inicio del pipeline y se realizó un re-check final tras estandarizar el texto.
+* **Qué decisión se tomó:** Se eliminaron las filas duplicadas mediante `df.drop_duplicates()` al inicio del pipeline y se realizó un *re-check* final tras estandarizar el texto.
 * **Por qué:** Conservar filas duplicadas infla artificialmente el volumen de transacciones, distorsiona los ingresos totales y genera sesgos en los indicadores por cliente.
 
 ---
@@ -33,7 +34,9 @@ Este documento explica el diagnóstico inicial, las decisiones de transformació
 * **Qué decisión se tomó:**
   1. Se utilizó `pd.to_datetime(df['fecha_registro'], format='mixed', dayfirst=True, errors='coerce')`.
   2. Se implementó un **assert de conservación** comparando el conteo de registros no nulos antes vs. después de la transformación:
-     $$\text{assert } \text{fechas\_después} \ge \text{fechas\_antes} \times 0.95$$
+
+$$\text{fechas\_después} \ge \text{fechas\_antes} \times 0.95$$
+
 * **Por qué:**
   * Sin `format='mixed'`, Pandas fuerza un único formato global para toda la columna; las filas con una sintaxis distinta fallan de forma silenciosa y se convierten en `NaT` al usar `errors='coerce'`.
   * `dayfirst=True` resuelve la ambigüedad en notaciones como `10-04-2023` (10 de abril vs. 4 de octubre), alineándola con la convención del dataset.
@@ -62,11 +65,11 @@ Este documento explica el diagnóstico inicial, las decisiones de transformació
   * Valores nulos (`NaN`) o textos no numéricos.
 * **Qué decisión se tomó:**
   1. Se realizó la conversión limpia a numérico mediante `pd.to_numeric(..., errors='coerce')`.
-  2. Se estableció como rango de transacción válida: **$0 < \text{monto\_compra} \le \$5,000$**.
+  2. Se estableció como rango de transacción válida: $\$0 < \text{monto\_compra} \le \$5,000$.
   3. Los valores fuera del rango, nulos e inviables fueron sustituidos por la **mediana** de las ventas válidas.
 * **Por qué:** 
   * Transacciones con monto $\le 0$ no corresponden a ventas válidas.
-  * Montos de $99,999.00 corresponden a valores "centinela" o errores de captura que distorsionan gravemente el ticket promedio del negocio. La imputación por mediana protege la integridad estadística de los indicadores financieros.
+  * Montos de $\$99,999.00$ corresponden a valores "centinela" o errores de captura que distorsionan gravemente el ticket promedio del negocio. La imputación por mediana protege la integridad estadística de los indicadores financieros.
 
 ---
 
@@ -77,8 +80,8 @@ Este documento explica el diagnóstico inicial, las decisiones de transformació
 | **Duplicados** | Filas 100% idénticas | 1 registro por evento | `drop_duplicates()` | Garantizar unicidad y no inflar métricas. |
 | **Texto** | Espacios, minúsculas, falta de tildes | Formato unificado | `strip()` + `title()` + `replace()` manual | Permitir agrupaciones (`GROUP BY`) consistentes. |
 | **Fechas** | Mezcla de formatos y texto libre | Tipo `datetime64` | `pd.to_datetime(..., errors='coerce')` | Habilitar análisis temporal y convertir errores a `NaT`. |
-| **Edad** | Negativos, >100 años y `NaN` | $18 \le \text{edad} \le 100$ | Imputación por mediana válida | Corregir errores sin sesgar la tendencia central. |
-| **Monto Compra** | Montos $\le 0$, $99,999$ y `NaN` | $0 < \text{monto} \le 5000$ | Imputación por mediana válida | Proteger el cálculo del ticket promedio. |
+| **Edad** | Negativos, $>100$ años y `NaN` | $18 \le \text{edad} \le 100$ | Imputación por mediana válida | Corregir errores sin sesgar la tendencia central. |
+| **Monto Compra** | Montos $\le 0$, $\$99,999$ y `NaN` | $0 < \text{monto} \le 5000$ | Imputación por mediana válida | Proteger el cálculo del ticket promedio. |
 
 ---
 
@@ -86,11 +89,15 @@ Este documento explica el diagnóstico inicial, las decisiones de transformació
 
 El script ejecuta los siguientes controles de aserciones de calidad antes de exportar el archivo final:
 
-1. **Sin duplicados:** `assert df.duplicated().sum() == 0`
-2. **Edades en rango:** `assert df['edad'].between(18, 100).all()`
-3. **Montos positivos:** `assert (df['monto_compra'] > 0).all()`
-4. **Formato de fecha:** `assert pd.api.types.is_datetime64_any_dtype(df['fecha_registro'])`
+```python
+# 1. Sin duplicados
+assert df.duplicated().sum() == 0
 
----
+# 2. Edades en rango
+assert df['edad'].between(18, 100).all()
 
-> **Resultado final:** Dataset `ventas_limpio.csv` 100% estandarizado, integro y listo para consumo en modelos de Machine Learning, SQL o dashboards de BI (Power BI / Tableau).
+# 3. Montos positivos
+assert (df['monto_compra'] > 0).all()
+
+# 4. Formato de fecha
+assert pd.api.types.is_datetime64_any_dtype(df['fecha_registro'])
